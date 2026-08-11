@@ -10,6 +10,7 @@ import { pool } from '../db/pool';
 const app = createApp();
 
 const testEmail = `test_${Date.now()}@example.com`;
+let authToken = '';
 
 describe('Auth', () => {
   afterAll(async () => {
@@ -53,6 +54,7 @@ describe('Auth', () => {
     });
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
+    authToken = res.body.token;
   });
 
   it('rejects login with wrong password', async () => {
@@ -60,6 +62,30 @@ describe('Auth', () => {
       email: testEmail,
       password: 'wrong-password',
     });
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects an existing token after the account is suspended', async () => {
+    await pool.query("UPDATE users SET account_status = 'suspended' WHERE email = $1", [testEmail]);
+
+    const res = await request(app)
+      .get('/me')
+      .set('Authorization', `Bearer ${authToken}`);
+
+    expect(res.status).toBe(401);
+  });
+
+  it('does not allow a deleted account to log in by email', async () => {
+    await pool.query(
+      "UPDATE users SET account_status = 'active', deleted_at = now() WHERE email = $1",
+      [testEmail]
+    );
+
+    const res = await request(app).post('/auth/login').send({
+      email: testEmail,
+      password: 'a-strong-password',
+    });
+
     expect(res.status).toBe(401);
   });
 });

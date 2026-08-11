@@ -85,8 +85,8 @@ export async function login(req: Request, res: Response) {
       `SELECT u.id, u.password_hash, u.is_admin, u.account_status, p.display_name
        FROM users u
        JOIN profiles p ON p.user_id = u.id
-       WHERE (u.email = $1 AND $1 IS NOT NULL) OR (u.phone = $2 AND $2 IS NOT NULL)
-       AND u.deleted_at IS NULL`,
+       WHERE ((u.email = $1 AND $1 IS NOT NULL) OR (u.phone = $2 AND $2 IS NOT NULL))
+         AND u.deleted_at IS NULL`,
       [email ?? null, phone ?? null]
     );
 

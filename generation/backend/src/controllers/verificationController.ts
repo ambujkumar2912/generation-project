@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { pool } from '../db/pool';
 import { AuthedRequest } from '../middleware/auth';
 import { storageAdapter } from '../utils/storage';
+import { validateVerificationDocument } from '../middleware/upload';
 
 const submitSchema = z.object({
   cohortId: z.string().uuid(),
@@ -18,6 +19,10 @@ export async function submitVerificationRequest(req: AuthedRequest, res: Respons
   }
   if (!req.file) {
     return res.status(400).json({ error: 'A document file is required' });
+  }
+  const documentError = validateVerificationDocument(req.file);
+  if (documentError) {
+    return res.status(400).json({ error: documentError });
   }
 
   const { cohortId, documentType } = parsed.data;
@@ -43,16 +48,33 @@ export async function submitVerificationRequest(req: AuthedRequest, res: Respons
       return res.status(409).json({ error: 'You are already verified for this cohort' });
     }
 
-    const storageKey = await storageAdapter.save(req.file.buffer, req.file.originalname);
-
-    const result = await pool.query(
-      `INSERT INTO verification_requests (user_id, cohort_id, document_type, document_storage_key, status)
-       VALUES ($1, $2, $3, $4, 'pending')
-       RETURNING id, status, created_at`,
-      [userId, cohortId, documentType, storageKey]
+    const cohort = await pool.query(
+      'SELECT id FROM cohorts WHERE id = $1 AND is_active = TRUE',
+      [cohortId]
     );
+    if (cohort.rows.length === 0) {
+      return res.status(400).json({ error: 'Selected cohort is not available' });
+    }
 
-    return res.status(201).json({ request: result.rows[0] });
+    const storageKey = await storageAdapter.save(req.file.buffer, req.file.originalname);
+    try {
+      const result = await pool.query(
+        `INSERT INTO verification_requests (user_id, cohort_id, document_type, document_storage_key, status)
+         VALUES ($1, $2, $3, $4, 'pending')
+         RETURNING id, status, created_at`,
+        [userId, cohortId, documentType, storageKey]
+      );
+
+      return res.status(201).json({ request: result.rows[0] });
+    } catch (err) {
+      // Do not leave a sensitive document on disk if its request was not saved.
+      try {
+        await storageAdapter.delete(storageKey);
+      } catch (cleanupErr) {
+        console.error('Failed to clean up orphaned verification document:', cleanupErr);
+      }
+      throw err;
+    }
   } catch (err) {
     console.error('Submit verification error:', err);
     return res.status(500).json({ error: 'Failed to submit verification request' });
@@ -164,13 +186,19 @@ export async function reviewVerificationRequest(req: AuthedRequest, res: Respons
 
     await client.query('COMMIT');
 
-    res.json({ requestId, decision });
+    try {
+      await storageAdapter.delete(request.document_storage_key);
+      await pool.query(
+        'UPDATE verification_requests SET document_deleted_at = now() WHERE id = $1',
+        [requestId]
+      );
+    } catch (cleanupErr) {
+      // The review decision is already committed. Log the cleanup failure for
+      // operational follow-up without falsely reporting that the review failed.
+      console.error('Failed to delete verification document after review:', cleanupErr);
+    }
 
-    // Best-effort cleanup after responding.
-    const { storageAdapter } = await import('../utils/storage');
-    storageAdapter.delete(request.document_storage_key).catch((err) => {
-      console.error('Failed to delete verification document after review:', err);
-    });
+    res.json({ requestId, decision });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('Review verification error:', err);

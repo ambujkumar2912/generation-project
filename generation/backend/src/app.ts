@@ -41,10 +41,19 @@ export function createApp() {
 
   // Central error handler
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-    // eslint-disable-next-line no-console
-    console.error(err);
-    res.status(err.status ?? 500).json({ error: err.message ?? 'Internal server error' });
+  app.use((err: Error & { status?: number }, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+    const status = err.status && err.status >= 400 && err.status < 500 ? err.status : 500;
+    // Keep diagnostic detail in server logs, never expose unexpected errors to clients.
+    console.error('Unhandled application error', {
+      message: err.message,
+      stack: err.stack,
+      method: req.method,
+      path: req.originalUrl,
+    });
+    const message = status === 500 || env.nodeEnv === 'production'
+      ? 'Internal server error'
+      : err.message;
+    res.status(status).json({ error: message });
   });
 
   return app;
