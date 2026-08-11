@@ -23,8 +23,8 @@ interface AuthContextValue {
   user: MeUser | null;
   verifiedCohorts: VerifiedCohort[];
   loading: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName: string) => Promise<void>;
+  login: (phone: string, password: string) => Promise<void>;
+  register: (phone: string, password: string, displayName: string, dateOfBirth: string, avatarUrl?: string, bio?: string, interests?: string[]) => Promise<void>;
   logout: () => void;
   refreshMe: () => Promise<void>;
 }
@@ -62,8 +62,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [refreshMe]);
 
   const login = useCallback(
-    async (email: string, password: string) => {
-      const res = await api.post('/auth/login', { email, password });
+    async (phone: string, password: string) => {
+      const res = await api.post('/auth/login', { phone, password });
       localStorage.setItem('generation_token', res.data.token);
       await refreshMe();
     },
@@ -71,10 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const register = useCallback(
-    async (email: string, password: string, displayName: string) => {
-      const res = await api.post('/auth/register', { email, password, displayName });
+    async (phone: string, password: string, displayName: string, dateOfBirth: string, avatarUrl?: string, bio?: string, interests?: string[]) => {
+      const res = await api.post('/auth/register', { phone, password, displayName, dateOfBirth });
       localStorage.setItem('generation_token', res.data.token);
       await refreshMe();
+      if (avatarUrl || bio || interests?.length) {
+        await api.patch('/profile', { ...(avatarUrl ? { avatarUrl } : {}), ...(bio ? { bio } : {}), ...(interests?.length ? { interests } : {}) });
+        await refreshMe();
+      }
     },
     [refreshMe]
   );

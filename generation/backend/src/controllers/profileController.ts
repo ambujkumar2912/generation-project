@@ -52,12 +52,13 @@ export async function getPublicProfile(req: AuthedRequest, res: Response) {
 
 const updateProfileSchema = z.object({
   displayName: z.string().min(1).max(80).optional(),
+  avatarUrl: z.string().url().max(2048).nullable().optional(),
   bio: z.string().max(500).optional(),
   educationCategory: z.string().max(100).optional(),
   careerCategory: z.string().max(100).optional(),
   broadLocation: z.string().max(100).optional(),
   interests: z.array(z.string().max(40)).max(15).optional(),
-});
+}).strict();
 
 export async function updateMyProfile(req: AuthedRequest, res: Response) {
   const parsed = updateProfileSchema.safeParse(req.body);
@@ -71,6 +72,7 @@ export async function updateMyProfile(req: AuthedRequest, res: Response) {
   // so a partial update doesn't null out fields that weren't included.
   const columnMap: Record<string, string> = {
     displayName: 'display_name',
+    avatarUrl: 'avatar_url',
     bio: 'bio',
     educationCategory: 'education_category',
     careerCategory: 'career_category',

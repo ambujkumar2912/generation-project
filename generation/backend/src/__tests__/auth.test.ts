@@ -9,47 +9,50 @@ import { pool } from '../db/pool';
 
 const app = createApp();
 
-const testEmail = `test_${Date.now()}@example.com`;
+const testPhone = `+919${String(Date.now()).slice(-9)}`;
 let authToken = '';
 
 describe('Auth', () => {
   afterAll(async () => {
-    await pool.query('DELETE FROM users WHERE email = $1', [testEmail]);
+    await pool.query('DELETE FROM users WHERE phone = $1', [testPhone]);
     await pool.end();
   });
 
   it('rejects registration with a short password', async () => {
     const res = await request(app).post('/auth/register').send({
-      email: testEmail,
+      phone: testPhone,
       password: '123',
       displayName: 'Test User',
+      dateOfBirth: '2006-05-14',
     });
     expect(res.status).toBe(400);
   });
 
   it('registers a new user', async () => {
     const res = await request(app).post('/auth/register').send({
-      email: testEmail,
+      phone: testPhone.replace('+91', '+91 '),
       password: 'a-strong-password',
       displayName: 'Test User',
+      dateOfBirth: '2006-05-14',
     });
     expect(res.status).toBe(201);
     expect(res.body.token).toBeDefined();
-    expect(res.body.user.email).toBe(testEmail);
+    expect(res.body.user.phone).toBe(testPhone);
   });
 
   it('rejects duplicate registration', async () => {
     const res = await request(app).post('/auth/register').send({
-      email: testEmail,
+      phone: testPhone,
       password: 'another-password',
       displayName: 'Duplicate',
+      dateOfBirth: '2005-01-01',
     });
     expect(res.status).toBe(409);
   });
 
   it('logs in with correct credentials', async () => {
     const res = await request(app).post('/auth/login').send({
-      email: testEmail,
+      phone: testPhone,
       password: 'a-strong-password',
     });
     expect(res.status).toBe(200);
@@ -59,14 +62,14 @@ describe('Auth', () => {
 
   it('rejects login with wrong password', async () => {
     const res = await request(app).post('/auth/login').send({
-      email: testEmail,
+      phone: testPhone,
       password: 'wrong-password',
     });
     expect(res.status).toBe(401);
   });
 
   it('rejects an existing token after the account is suspended', async () => {
-    await pool.query("UPDATE users SET account_status = 'suspended' WHERE email = $1", [testEmail]);
+    await pool.query("UPDATE users SET account_status = 'suspended' WHERE phone = $1", [testPhone]);
 
     const res = await request(app)
       .get('/me')
@@ -77,12 +80,12 @@ describe('Auth', () => {
 
   it('does not allow a deleted account to log in by email', async () => {
     await pool.query(
-      "UPDATE users SET account_status = 'active', deleted_at = now() WHERE email = $1",
-      [testEmail]
+      "UPDATE users SET account_status = 'active', deleted_at = now() WHERE phone = $1",
+      [testPhone]
     );
 
     const res = await request(app).post('/auth/login').send({
-      email: testEmail,
+      phone: testPhone,
       password: 'a-strong-password',
     });
 

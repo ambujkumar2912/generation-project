@@ -4,7 +4,6 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LandingPage } from './pages/LandingPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { LoginPage } from './pages/LoginPage';
-import { CohortOnboardingPage } from './pages/CohortOnboardingPage';
 import { HomePage } from './pages/HomePage';
 
 export default function App() {
@@ -15,14 +14,8 @@ export default function App() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/login" element={<LoginPage />} />
-          <Route
-            path="/onboarding/cohort"
-            element={
-              <ProtectedRoute>
-                <CohortOnboardingPage />
-              </ProtectedRoute>
-            }
-          />
+          {/* Legacy document-verification onboarding is intentionally not routed.
+              Phone + DOB onboarding in RegisterPage is the active MVP flow. */}
           <Route
             path="/home"
             element={

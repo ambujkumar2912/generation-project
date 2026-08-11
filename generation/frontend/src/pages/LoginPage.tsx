@@ -6,7 +6,7 @@ import { apiErrorMessage } from '../api/client';
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -16,7 +16,7 @@ export function LoginPage() {
     setError(null);
     setSubmitting(true);
     try {
-      await login(email, password);
+      await login(phone, password);
       navigate('/home');
     } catch (err) {
       setError(apiErrorMessage(err));
@@ -35,15 +35,15 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
-            <label className="font-body text-sm font-medium text-navy" htmlFor="email">
-              Email
+            <label className="font-body text-sm font-medium text-navy" htmlFor="phone">
+              Phone number
             </label>
             <input
-              id="email"
-              type="email"
+              id="phone"
+              type="tel"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
               className="mt-1 w-full rounded-sm border border-navy/20 bg-white px-3 py-2 font-body text-sm text-ink focus:border-gold focus:outline-none focus:ring-2 focus:ring-gold/40"
             />
           </div>

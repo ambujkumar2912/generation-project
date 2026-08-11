@@ -10,6 +10,9 @@ import {
 
 const router = Router();
 
+// Deprecated legacy workflow: retained temporarily for data-history safety,
+// but no longer used by registration or active frontend routes.
+
 router.post('/request', requireAuth, uploadVerificationDocument, submitVerificationRequest);
 router.get('/status', requireAuth, getMyVerificationStatus);
 
