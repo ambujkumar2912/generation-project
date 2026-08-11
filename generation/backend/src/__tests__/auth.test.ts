@@ -11,6 +11,7 @@ const app = createApp();
 
 const testPhone = `+919${String(Date.now()).slice(-9)}`;
 let authToken = '';
+let userId = '';
 
 describe('Auth', () => {
   afterAll(async () => {
@@ -38,6 +39,7 @@ describe('Auth', () => {
     expect(res.status).toBe(201);
     expect(res.body.token).toBeDefined();
     expect(res.body.user.phone).toBe(testPhone);
+    userId = res.body.user.id;
   });
 
   it('rejects duplicate registration', async () => {
@@ -58,6 +60,31 @@ describe('Auth', () => {
     expect(res.status).toBe(200);
     expect(res.body.token).toBeDefined();
     authToken = res.body.token;
+  });
+
+  it('returns a private-safe public profile and updates only allowed fields', async () => {
+    const publicProfile = await request(app)
+      .get(`/profile/${userId}`)
+      .set('Authorization', `Bearer ${authToken}`);
+    expect(publicProfile.status).toBe(200);
+    expect(publicProfile.body.profile.phone).toBeUndefined();
+    expect(publicProfile.body.profile.date_of_birth).toBeUndefined();
+
+    const updated = await request(app).patch('/profile').set('Authorization', `Bearer ${authToken}`).send({
+      displayName: 'Updated User', bio: 'Building Generation', interests: ['AI', 'Coding'],
+    });
+    expect(updated.status).toBe(200);
+    expect(updated.body.profile.display_name).toBe('Updated User');
+  });
+
+  it('rejects invalid or private profile changes', async () => {
+    for (const payload of [
+      { displayName: '' }, { bio: 'x'.repeat(501) }, { interests: [''] },
+      { dateOfBirth: '2005-01-01' }, { phone: '+919999999999' }, { generation: '2005' },
+    ]) {
+      const res = await request(app).patch('/profile').set('Authorization', `Bearer ${authToken}`).send(payload);
+      expect(res.status).toBe(400);
+    }
   });
 
   it('rejects login with wrong password', async () => {

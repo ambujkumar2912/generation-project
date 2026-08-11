@@ -5,6 +5,9 @@ import { LandingPage } from './pages/LandingPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
+import { ProfilePage } from './pages/ProfilePage';
+import { EditProfilePage } from './pages/EditProfilePage';
+import { AppLayout } from './components/AppLayout';
 
 export default function App() {
   return (
@@ -16,14 +19,11 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           {/* Legacy document-verification onboarding is intentionally not routed.
               Phone + DOB onboarding in RegisterPage is the active MVP flow. */}
-          <Route
-            path="/home"
-            element={
-              <ProtectedRoute>
-                <HomePage />
-              </ProtectedRoute>
-            }
-          />
+          <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/profile/edit" element={<EditProfilePage />} />
+          </Route>
         </Routes>
       </AuthProvider>
     </BrowserRouter>
