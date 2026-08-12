@@ -9,6 +9,7 @@ import verificationRoutes from './routes/verificationRoutes';
 import profileRoutes from './routes/profileRoutes';
 import postRoutes from './routes/postRoutes';
 import userRoutes from './routes/userRoutes';
+import friendRoutes from './routes/friendRoutes';
 import { requireAuth } from './middleware/auth';
 import { getMe } from './controllers/meController';
 
@@ -39,6 +40,7 @@ export function createApp() {
   app.use('/profile', profileRoutes);
   app.use('/posts', postRoutes);
   app.use('/users', userRoutes);
+  app.use('/users', friendRoutes);
 
   // 404 handler
   app.use((_req, res) => res.status(404).json({ error: 'Not found' }));
