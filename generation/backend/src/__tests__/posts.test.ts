@@ -6,9 +6,9 @@ import { pool } from '../db/pool';
 const app = createApp();
 const suffix = String(Date.now()).slice(-8);
 const users = [
-  { phone: `+9181${suffix}`, dateOfBirth: '1999-04-12', displayName: 'Post Author' },
-  { phone: `+9182${suffix}`, dateOfBirth: '1999-11-05', displayName: 'Same Cohort' },
-  { phone: `+9183${suffix}`, dateOfBirth: '2000-03-19', displayName: 'Other Cohort' },
+  { phone: `+9181${suffix}`, dateOfBirth: '1999-04-12', displayName: 'Post Author', username: `postauthor${suffix}` },
+  { phone: `+9182${suffix}`, dateOfBirth: '1999-11-05', displayName: 'Same Cohort', username: `samecohort${suffix}` },
+  { phone: `+9183${suffix}`, dateOfBirth: '2000-03-19', displayName: 'Other Cohort', username: `othercohort${suffix}` },
 ];
 let authorToken = ''; let sameCohortToken = ''; let otherCohortToken = '';
 

@@ -24,6 +24,7 @@ describe('Auth', () => {
       phone: testPhone,
       password: '123',
       displayName: 'Test User',
+      username: `testuser_${String(Date.now()).slice(-8)}`,
       dateOfBirth: '2006-05-14',
     });
     expect(res.status).toBe(400);
@@ -34,6 +35,7 @@ describe('Auth', () => {
       phone: testPhone.replace('+91', '+91 '),
       password: 'a-strong-password',
       displayName: 'Test User',
+      username: `testuser_${String(Date.now()).slice(-8)}`,
       dateOfBirth: '2006-05-14',
     });
     expect(res.status).toBe(201);
@@ -47,6 +49,7 @@ describe('Auth', () => {
       phone: testPhone,
       password: 'another-password',
       displayName: 'Duplicate',
+      username: `duplicate_${String(Date.now()).slice(-8)}`,
       dateOfBirth: '2005-01-01',
     });
     expect(res.status).toBe(409);

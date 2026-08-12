@@ -9,7 +9,7 @@ export async function getPublicProfile(req: AuthedRequest, res: Response) {
   const { userId } = req.params;
   try {
     const result = await pool.query(
-      `SELECT p.user_id, p.display_name, p.bio, p.avatar_url,
+      `SELECT p.user_id, u.username, p.display_name, p.bio, p.avatar_url,
               p.education_category, p.career_category, p.broad_location,
               p.interests, p.helpful_contributions_count
        FROM profiles p

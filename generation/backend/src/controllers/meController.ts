@@ -6,7 +6,7 @@ export async function getMe(req: AuthedRequest, res: Response) {
   const userId = req.user!.userId;
   try {
     const result = await pool.query(
-      `SELECT u.id, u.email, u.phone, u.is_admin, u.created_at,
+      `SELECT u.id, u.email, u.phone, u.username, u.last_username_change_at, u.is_admin, u.created_at,
               p.display_name, p.bio, p.avatar_url, p.interests
        FROM users u
        JOIN profiles p ON p.user_id = u.id

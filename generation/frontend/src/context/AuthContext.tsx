@@ -5,6 +5,8 @@ interface MeUser {
   id: string;
   email: string | null;
   phone: string | null;
+  username: string | null;
+  last_username_change_at?: string | null;
   is_admin: boolean;
   display_name: string;
   bio: string | null;
@@ -24,7 +26,7 @@ interface AuthContextValue {
   verifiedCohorts: VerifiedCohort[];
   loading: boolean;
   login: (phone: string, password: string) => Promise<void>;
-  register: (phone: string, password: string, displayName: string, dateOfBirth: string, avatarUrl?: string, bio?: string, interests?: string[]) => Promise<void>;
+  register: (phone: string, password: string, displayName: string, username: string, dateOfBirth: string, avatarUrl?: string, bio?: string, interests?: string[]) => Promise<void>;
   logout: () => void;
   refreshMe: () => Promise<void>;
 }
@@ -71,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const register = useCallback(
-    async (phone: string, password: string, displayName: string, dateOfBirth: string, avatarUrl?: string, bio?: string, interests?: string[]) => {
-      const res = await api.post('/auth/register', { phone, password, displayName, dateOfBirth });
+    async (phone: string, password: string, displayName: string, username: string, dateOfBirth: string, avatarUrl?: string, bio?: string, interests?: string[]) => {
+      const res = await api.post('/auth/register', { phone, password, displayName, username, dateOfBirth });
       localStorage.setItem('generation_token', res.data.token);
       await refreshMe();
       if (avatarUrl || bio || interests?.length) {

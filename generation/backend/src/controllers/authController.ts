@@ -4,11 +4,13 @@ import { pool } from '../db/pool';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { signAuthToken } from '../utils/jwt';
 import { normalizePhoneNumber } from '../utils/phone';
+import { normalizeUsername } from '../utils/username';
 
 const registerSchema = z.object({
   phone: z.string().min(1),
   password: z.string().min(8, 'Password must be at least 8 characters'),
   displayName: z.string().min(1).max(80),
+  username: z.string().min(1).max(64),
   dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
 });
 
@@ -48,17 +50,19 @@ export async function register(req: Request, res: Response) {
     return res.status(400).json({ error: parsed.error.flatten() });
   }
   const { password, displayName, dateOfBirth } = parsed.data;
+  const username = normalizeUsername(parsed.data.username);
   const phone = normalizePhoneNumber(parsed.data.phone);
   const dob = parseDateOfBirth(dateOfBirth);
   if (!phone) return res.status(400).json({ error: 'Enter a valid phone number with country code' });
   if (!dob) return res.status(400).json({ error: 'Enter a real date of birth that is not in the future' });
+  if (!username) return res.status(400).json({ error: 'Choose a valid username' });
 
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
 
     const existing = await client.query(
-      'SELECT id FROM users WHERE phone = $1', [phone]
+      'SELECT id FROM users WHERE phone = $1 OR username = $2', [phone, username]
     );
     if (existing.rows.length > 0) {
       await client.query('ROLLBACK');
@@ -68,9 +72,9 @@ export async function register(req: Request, res: Response) {
     const passwordHash = await hashPassword(password);
 
     const userResult = await client.query(
-      `INSERT INTO users (phone, password_hash, date_of_birth)
-       VALUES ($1, $2, $3) RETURNING id, phone, created_at`,
-      [phone, passwordHash, dateOfBirth]
+      `INSERT INTO users (phone, password_hash, date_of_birth, username, username_initialized_at)
+       VALUES ($1, $2, $3, $4, now()) RETURNING id, phone, username, created_at`,
+      [phone, passwordHash, dateOfBirth, username]
     );
     const user = userResult.rows[0];
 
@@ -88,12 +92,13 @@ export async function register(req: Request, res: Response) {
     const token = signAuthToken({ userId: user.id, isAdmin: false });
     return res.status(201).json({
       token,
-      user: { id: user.id, phone: user.phone, displayName },
+      user: { id: user.id, phone: user.phone, username: user.username, displayName },
     });
-  } catch (err) {
+  } catch (err: any) {
     await client.query('ROLLBACK');
     // eslint-disable-next-line no-console
     console.error('Register error:', err);
+    if (err?.code === '23505') return res.status(409).json({ error: 'An account or username already exists' });
     return res.status(500).json({ error: 'Failed to register' });
   } finally {
     client.release();

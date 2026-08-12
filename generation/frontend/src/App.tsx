@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { HomePage } from './pages/HomePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { EditProfilePage } from './pages/EditProfilePage';
+import { PublicProfilePage } from './pages/PublicProfilePage';
 import { AppLayout } from './components/AppLayout';
 
 export default function App() {
@@ -23,6 +24,8 @@ export default function App() {
             <Route path="/home" element={<HomePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/profile/edit" element={<EditProfilePage />} />
+            <Route path="/profile/:userId" element={<PublicProfilePage />} />
+            <Route path="/users/:username" element={<PublicProfilePage />} />
           </Route>
         </Routes>
       </AuthProvider>
