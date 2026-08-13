@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { createPost, fetchPosts, type ApiPost } from '../api/posts';
+import { createPost, deletePost, fetchPosts, type ApiPost } from '../api/posts';
 import { mockPosts, type HomePost } from '../mock/home';
 
 const tones = ['from-[#5b90ce] via-[#7cb8ca] to-[#f0bc60]', 'from-[#f3c164] via-[#ed997a] to-[#6654a8]', 'from-[#f6cc68] via-[#e88975] to-[#4f527f]'];
@@ -9,7 +9,7 @@ function formatTime(value: string) {
 }
 export function toHomePost(post: ApiPost): HomePost {
   const toneIndex = [...post.id].reduce((total, char) => total + char.charCodeAt(0), 0) % tones.length;
-  return { id: post.id, author: post.author.displayName, time: formatTime(post.createdAt), kind: 'Text', content: post.content, tags: [], tone: tones[toneIndex], reactions: 0, comments: 0 };
+  return { id: post.id, author: post.author.displayName, authorId: post.author.id, time: formatTime(post.createdAt), kind: 'Text', content: post.content, tags: [], tone: tones[toneIndex], reactions: 0, comments: 0 };
 }
 export function useGenerationFeed() {
   const [posts, setPosts] = useState<HomePost[]>([]); const [loading, setLoading] = useState(true); const [error, setError] = useState<string | null>(null);
@@ -21,5 +21,6 @@ export function useGenerationFeed() {
   }, []);
   useEffect(() => { refresh(); }, [refresh]);
   const submit = useCallback(async (content: string) => { const created = await createPost(content); const post = toHomePost(created); setPosts((current) => [post, ...current]); return post; }, []);
-  return { posts, loading, error, refresh, submit };
+  const remove = useCallback(async (postId: string) => { await deletePost(postId); setPosts((current) => current.filter((post) => post.id !== postId)); }, []);
+  return { posts, loading, error, refresh, submit, remove };
 }

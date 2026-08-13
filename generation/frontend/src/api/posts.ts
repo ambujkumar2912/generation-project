@@ -18,6 +18,10 @@ export async function createPost(content: string) {
   const response = await api.post<{ post: ApiPost }>('/posts', { content });
   return response.data.post;
 }
+export async function deletePost(postId: string) {
+  const response = await api.delete<{ deletedPostId: string }>(`/posts/${encodeURIComponent(postId)}`);
+  return response.data;
+}
 export async function fetchPostsByUsername(username: string, limit = 15) {
   const response = await api.get<UserPostsResponse>(`/posts/user/${encodeURIComponent(username)}`, { params: { limit } });
   return response.data;

@@ -6,6 +6,7 @@ import { AuthedRequest } from '../middleware/auth';
 const createPostSchema = z.object({ content: z.string().trim().min(1).max(2000) }).strict();
 const feedQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(50).default(15), cursor: z.string().optional() });
 const userPostsQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(50).default(15) });
+const postIdSchema = z.string().uuid();
 
 type Cursor = { createdAt: string; id: string };
 function encodeCursor(cursor: Cursor): string { return Buffer.from(JSON.stringify(cursor)).toString('base64url'); }
@@ -42,6 +43,32 @@ export async function createTextPost(req: AuthedRequest, res: Response) {
     const profile = await pool.query<{ display_name: string; avatar_url: string | null }>('SELECT display_name, avatar_url FROM profiles WHERE user_id = $1', [req.user!.userId]);
     return res.status(201).json({ post: { ...toPost(result.rows[0]), author: { id: req.user!.userId, displayName: profile.rows[0].display_name, avatarUrl: profile.rows[0].avatar_url } } });
   } catch (err) { console.error('Create post error:', err); return res.status(500).json({ error: 'Failed to create post' }); }
+}
+
+export async function deleteOwnPost(req: AuthedRequest, res: Response) {
+  const parsedPostId = postIdSchema.safeParse(req.params.postId);
+  if (!parsedPostId.success) return res.status(404).json({ error: 'Post not found' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query<{ author_id: string; type: string; deleted_at: Date | null }>(
+      'SELECT author_id, type, deleted_at FROM posts WHERE id = $1 FOR UPDATE',
+      [parsedPostId.data]
+    );
+    const post = result.rows[0];
+    if (!post || post.type !== 'text') { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Post not found' }); }
+    if (post.author_id !== req.user!.userId) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'You can only delete your own posts' }); }
+    if (post.deleted_at) { await client.query('ROLLBACK'); return res.status(410).json({ error: 'Post has already been deleted' }); }
+    await client.query('UPDATE posts SET deleted_at = now() WHERE id = $1', [parsedPostId.data]);
+    await client.query('COMMIT');
+    return res.json({ deletedPostId: parsedPostId.data });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Delete post error:', err);
+    return res.status(500).json({ error: 'Failed to delete post' });
+  } finally {
+    client.release();
+  }
 }
 
 export async function getUserPosts(req: AuthedRequest, res: Response) {

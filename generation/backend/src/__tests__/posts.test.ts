@@ -70,6 +70,25 @@ describe('Generation text posts', () => {
     expect(secondPage.body.posts.every((post: { id: string }) => !firstPage.body.posts.some((first: { id: string }) => first.id === post.id))).toBe(true);
   });
 
+  it('soft-deletes only the owner’s text post across every read endpoint', async () => {
+    const created = await request(app).post('/posts').set('Authorization', `Bearer ${authorToken}`).send({ content: 'Post to delete' });
+    expect(created.status).toBe(201);
+    const postId = created.body.post.id;
+
+    expect((await request(app).delete(`/posts/${postId}`)).status).toBe(401);
+    expect((await request(app).delete(`/posts/${postId}`).set('Authorization', `Bearer ${sameCohortToken}`)).status).toBe(403);
+    expect((await request(app).delete('/posts/00000000-0000-0000-0000-000000000000').set('Authorization', `Bearer ${authorToken}`)).status).toBe(404);
+    expect((await request(app).delete(`/posts/${postId}`).set('Authorization', `Bearer ${authorToken}`)).body).toEqual({ deletedPostId: postId });
+    expect((await request(app).delete(`/posts/${postId}`).set('Authorization', `Bearer ${authorToken}`)).status).toBe(410);
+
+    const feed = await request(app).get('/posts').set('Authorization', `Bearer ${sameCohortToken}`);
+    const ownPosts = await request(app).get('/posts/me').set('Authorization', `Bearer ${authorToken}`);
+    const publicPosts = await request(app).get(`/posts/user/${users[0].username}`).set('Authorization', `Bearer ${sameCohortToken}`);
+    for (const response of [feed, ownPosts, publicPosts]) {
+      expect(response.body.posts.some((post: { id: string }) => post.id === postId)).toBe(false);
+    }
+  });
+
   it('blocks a suspended account with an existing token from posting', async () => {
     await pool.query("UPDATE users SET account_status = 'suspended' WHERE phone = $1", [users[0].phone]);
     const response = await request(app).post('/posts').set('Authorization', `Bearer ${authorToken}`).send({ content: 'This must not be created' });

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 import { api, apiErrorMessage } from '../api/client';
-import type { ApiPost } from '../api/posts';
+import { deletePost, type ApiPost } from '../api/posts';
 import { useAuth } from '../context/AuthContext';
 
 type IncomingRequest = {
@@ -149,6 +149,15 @@ export function ProfilePage() {
     }
   };
 
+  const handleDeletePost = async (postId: string) => {
+    try {
+      await deletePost(postId);
+      setPosts(prev => prev.filter(post => post.id !== postId));
+    } catch (err) {
+      setPostsError(apiErrorMessage(err));
+    }
+  };
+
   if (!user) return null;
 
   const cohort =
@@ -283,6 +292,7 @@ export function ProfilePage() {
                     <p className="text-[10px] text-ink/45">
                       · {post.createdAt}
                     </p>
+                    <button onClick={() => handleDeletePost(post.id)} className="mt-2 text-xs font-semibold text-red-600">Delete</button>
                   </div>
                 </div>
               ))}

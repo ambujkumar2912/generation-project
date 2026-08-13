@@ -2,7 +2,7 @@
 // view models so the Home UI can remain unchanged when real data arrives.
 
 export interface HomeMoment { id: string; name: string; note: string; }
-export interface HomePost { id: string; author: string; time: string; kind: string; content: string; tags: string[]; tone: string; reactions: number; comments: number; }
+export interface HomePost { id: string; author: string; authorId?: string; time: string; kind: string; content: string; tags: string[]; tone: string; reactions: number; comments: number; }
 export interface HomeTopic { id: string; icon: string; title: string; talkingCount: number; }
 export interface HomeHelpRequest { id: string; authorInitial: string; question: string; answerCount: number; }
 export interface ComposerAction { id: string; icon: string; label: string; }
