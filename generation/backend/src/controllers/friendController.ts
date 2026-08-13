@@ -222,3 +222,27 @@ export async function rejectFriendRequest(req: AuthedRequest, res: Response) {
     return res.status(500).json({ error: 'Failed to reject friend request' });
   }
 }
+
+const getFriendsQuery = `
+  SELECT DISTINCT u.id, u.username
+  FROM users u
+  WHERE u.id IN (
+    SELECT fr.receiver_id FROM friend_requests fr WHERE fr.sender_id = $1 AND fr.status = 'accepted'
+    UNION
+    SELECT fr.sender_id FROM friend_requests fr WHERE fr.receiver_id = $1 AND fr.status = 'accepted'
+  )
+  AND u.id != $1
+`;
+
+export async function getFriends(req: AuthedRequest, res: Response) {
+  const userId = req.user!.userId;
+
+  const result = await pool.query(getFriendsQuery, [userId]);
+
+  const friends = result.rows.map(row => ({
+    id: row.id,
+    username: row.username,
+  }));
+
+  return res.json({ friends });
+}
