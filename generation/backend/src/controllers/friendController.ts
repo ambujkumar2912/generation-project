@@ -117,6 +117,41 @@ export async function getIncomingFriendRequests(req: AuthedRequest, res: Respons
   return res.json({ requests });
 }
 
+export async function getFriendshipStatus(req: AuthedRequest, res: Response) {
+  const username = normalizeUsernameSearch(req.params.username);
+  if (!username) return res.status(404).json({ error: 'User not found' });
+
+  try {
+    const targetResult = await pool.query<{ id: string }>(
+      `SELECT id FROM users WHERE username = $1 AND account_status = 'active' AND deleted_at IS NULL`,
+      [username]
+    );
+    const target = targetResult.rows[0];
+    if (!target) return res.status(404).json({ error: 'User not found' });
+    if (target.id === req.user!.userId) return res.json({ status: 'none' });
+
+    const relationship = await pool.query<{ id: string; status: string; sender_id: string }>(
+      `SELECT id, status, sender_id
+       FROM friend_requests
+       WHERE ((sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1))
+         AND status IN ('pending', 'accepted')
+       ORDER BY CASE status WHEN 'accepted' THEN 0 ELSE 1 END, updated_at DESC
+       LIMIT 1`,
+      [req.user!.userId, target.id]
+    );
+    const request = relationship.rows[0];
+    if (!request) return res.json({ status: 'none' });
+    if (request.status === 'accepted') return res.json({ status: 'friends' });
+    return res.json({
+      status: request.sender_id === req.user!.userId ? 'outgoing_pending' : 'incoming_pending',
+      requestId: request.id,
+    });
+  } catch (err) {
+    console.error('Get friendship status error:', err);
+    return res.status(500).json({ error: 'Failed to fetch friendship status' });
+  }
+}
+
 const acceptFriendRequestQuery = `
   UPDATE friend_requests
   SET status = 'accepted',

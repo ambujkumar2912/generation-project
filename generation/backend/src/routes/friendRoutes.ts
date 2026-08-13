@@ -6,6 +6,7 @@ import {
   acceptFriendRequest,
   rejectFriendRequest,
   getFriends,
+  getFriendshipStatus,
 } from '../controllers/friendController';
 
 const router = Router();
@@ -15,5 +16,6 @@ router.get('/me/friend-requests', requireAuth, getIncomingFriendRequests);
 router.post('/friend-requests/:requestId/accept', requireAuth, acceptFriendRequest);
 router.post('/friend-requests/:requestId/reject', requireAuth, rejectFriendRequest);
 router.get('/me/friends', requireAuth, getFriends);
+router.get('/:username/friendship-status', requireAuth, getFriendshipStatus);
 
 export default router;

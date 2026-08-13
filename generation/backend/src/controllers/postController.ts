@@ -64,6 +64,48 @@ export async function getUserPosts(req: AuthedRequest, res: Response) {
   } catch (err) { console.error('Get user posts error:', err); return res.status(500).json({ error: 'Failed to fetch user posts' }); }
 }
 
+export async function getPostsByUsername(req: AuthedRequest, res: Response) {
+  const username = req.params.username.trim().replace(/^@/, '').toLowerCase();
+  if (!/^[a-z0-9_]{6,20}$/.test(username)) return res.status(404).json({ error: 'User not found' });
+  const parsed = userPostsQuerySchema.safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+  try {
+    const targetResult = await pool.query<{ id: string; cohort_id: string | null }>(
+      `SELECT u.id, cm.cohort_id
+       FROM users u
+       LEFT JOIN cohort_members cm ON cm.user_id = u.id AND cm.is_primary = TRUE
+       LEFT JOIN cohorts c ON c.id = cm.cohort_id
+       WHERE u.username = $1 AND u.account_status = 'active' AND u.deleted_at IS NULL
+         AND (cm.cohort_id IS NULL OR c.is_active = TRUE)
+       LIMIT 1`,
+      [username]
+    );
+    const target = targetResult.rows[0];
+    if (!target) return res.status(404).json({ error: 'User not found' });
+
+    const viewerCohortId = await getPrimaryCohortId(req.user!.userId);
+    if (!viewerCohortId || viewerCohortId !== target.cohort_id) {
+      return res.json({ posts: [], nextCursor: null, visibility: 'limited_to_same_cohort' });
+    }
+
+    const result = await pool.query(
+      `SELECT p.id, p.author_id, p.cohort_id, p.body, p.created_at, p.updated_at, pr.display_name, pr.avatar_url
+       FROM posts p
+       JOIN users u ON u.id = p.author_id
+       JOIN profiles pr ON pr.user_id = p.author_id
+       WHERE p.author_id = $1 AND p.cohort_id = $2 AND p.type = 'text' AND p.deleted_at IS NULL
+         AND u.account_status = 'active' AND u.deleted_at IS NULL
+       ORDER BY p.created_at DESC, p.id DESC
+       LIMIT $3`,
+      [target.id, target.cohort_id, parsed.data.limit]
+    );
+    return res.json({ posts: result.rows.map(toPost), nextCursor: null, visibility: 'visible' });
+  } catch (err) {
+    console.error('Get posts by username error:', err);
+    return res.status(500).json({ error: 'Failed to fetch user posts' });
+  }
+}
+
 export async function getGenerationFeed(req: AuthedRequest, res: Response) {
   const parsed = feedQuerySchema.safeParse(req.query);
   if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
