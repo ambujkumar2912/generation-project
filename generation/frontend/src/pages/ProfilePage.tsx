@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Avatar } from '../components/Avatar';
 import { api, apiErrorMessage } from '../api/client';
+import type { ApiPost } from '../api/posts';
 import { useAuth } from '../context/AuthContext';
 
 type IncomingRequest = {
@@ -29,6 +30,10 @@ export function ProfilePage() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendsLoading, setFriendsLoading] = useState(true);
   const [friendsError, setFriendsError] = useState<string | null>(null);
+
+  const [posts, setPosts] = useState<ApiPost[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [postsError, setPostsError] = useState<string | null>(null);
 
   const [requestStatus, setRequestStatus] = useState<Record<string, RequestStatus>>({});
 
@@ -64,6 +69,23 @@ export function ProfilePage() {
     loadIncomingRequests();
     loadFriends();
   }, []);
+
+  useEffect(() => {
+    async function loadPostsIfNeeded() {
+      if (tab !== 'Posts') return;
+      setPostsLoading(true);
+      setPostsError(null);
+      try {
+        const res = await api.get('/posts/me');
+        setPosts(res.data.posts ?? []);
+      } catch (err) {
+        setPostsError(apiErrorMessage(err));
+      } finally {
+        setPostsLoading(false);
+      }
+    }
+    loadPostsIfNeeded();
+  }, [tab]);
 
   const handleAcceptClick = async (requestId: string) => {
     setRequestStatus(prev => ({ ...prev, [requestId]: 'accepting' }));
@@ -236,6 +258,38 @@ export function ProfilePage() {
           </button>
         ))}
       </div>
+      {tab === 'Posts' && (
+        <section className="mt-5 rounded-2xl border border-navy/[0.08] bg-white p-6 shadow-[0_4px_15px_rgba(27,42,74,.035)]">
+          {postsLoading ? (
+            <p className="text-sm text-ink/55">Loading posts…</p>
+          ) : postsError ? (
+            <p className="text-sm text-red-500">Error loading posts.</p>
+          ) : posts.length === 0 ? (
+            <p className="text-sm text-ink/55">No posts yet.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {posts.map((post) => (
+                <div key={post.id} className="flex items-start gap-3">
+                  <div className="flex-shrink-0 rounded-full border-4 border-white">
+                    <Avatar name={post.author.displayName} src={post.author.avatarUrl} />
+                  </div>
+                  <div>
+                    <p className="font-medium text-navy/75">
+                      {post.author.displayName}
+                    </p>
+                    <p className="text-[10px] text-ink/45">
+                      {post.content}
+                    </p>
+                    <p className="text-[10px] text-ink/45">
+                      · {post.createdAt}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
     </main>
   );
 }

@@ -5,6 +5,7 @@ import { AuthedRequest } from '../middleware/auth';
 
 const createPostSchema = z.object({ content: z.string().trim().min(1).max(2000) }).strict();
 const feedQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(50).default(15), cursor: z.string().optional() });
+const userPostsQuerySchema = z.object({ limit: z.coerce.number().int().min(1).max(50).default(15) });
 
 type Cursor = { createdAt: string; id: string };
 function encodeCursor(cursor: Cursor): string { return Buffer.from(JSON.stringify(cursor)).toString('base64url'); }
@@ -41,6 +42,26 @@ export async function createTextPost(req: AuthedRequest, res: Response) {
     const profile = await pool.query<{ display_name: string; avatar_url: string | null }>('SELECT display_name, avatar_url FROM profiles WHERE user_id = $1', [req.user!.userId]);
     return res.status(201).json({ post: { ...toPost(result.rows[0]), author: { id: req.user!.userId, displayName: profile.rows[0].display_name, avatarUrl: profile.rows[0].avatar_url } } });
   } catch (err) { console.error('Create post error:', err); return res.status(500).json({ error: 'Failed to create post' }); }
+}
+
+export async function getUserPosts(req: AuthedRequest, res: Response) {
+  try {
+    const parsed = userPostsQuerySchema.safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const limit = parsed.data.limit;
+    const result = await pool.query(
+      `SELECT p.id, p.author_id, p.cohort_id, p.body, p.created_at, p.updated_at, pr.display_name, pr.avatar_url
+       FROM posts p JOIN users u ON u.id = p.author_id JOIN profiles pr ON pr.user_id = p.author_id
+       WHERE p.author_id = $1 AND p.type = 'text' AND p.deleted_at IS NULL
+         AND u.account_status = 'active' AND u.deleted_at IS NULL
+       ORDER BY p.created_at DESC, p.id DESC LIMIT $2`,
+      [req.user!.userId, limit]
+    );
+    const hasMore = result.rows.length > limit;
+    const rows = hasMore ? result.rows.slice(0, -1) : result.rows;
+    const last = rows[rows.length - 1];
+    return res.json({ posts: rows.map(toPost), nextCursor: hasMore && last ? encodeCursor({ createdAt: last.created_at.toISOString(), id: last.id }) : null });
+  } catch (err) { console.error('Get user posts error:', err); return res.status(500).json({ error: 'Failed to fetch user posts' }); }
 }
 
 export async function getGenerationFeed(req: AuthedRequest, res: Response) {
