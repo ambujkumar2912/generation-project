@@ -13,6 +13,15 @@ const checkExistingRequestQuery = `
   LIMIT 1
 `;
 
+const getIncomingFriendRequestsQuery = `
+  SELECT fr.id, fr.sender_id, fr.receiver_id, fr.status, fr.created_at,
+         u.id AS requester_id, u.username AS requester_username
+  FROM friend_requests fr
+  JOIN users u ON u.id = fr.sender_id
+  WHERE fr.receiver_id = $1 AND fr.status = 'pending'
+  ORDER BY fr.created_at DESC
+`;
+
 export async function sendFriendRequest(req: AuthedRequest, res: Response) {
   const requesterId = req.user!.userId;
   const recipientUsername = req.params.username;
@@ -87,5 +96,129 @@ export async function sendFriendRequest(req: AuthedRequest, res: Response) {
     }
     console.error('Send friend request error:', err);
     return res.status(500).json({ error: 'Failed to send friend request' });
+  }
+}
+
+export async function getIncomingFriendRequests(req: AuthedRequest, res: Response) {
+  const userId = req.user!.userId;
+
+  const result = await pool.query(getIncomingFriendRequestsQuery, [userId]);
+
+  const requests = result.rows.map(row => ({
+    id: row.id,
+    requester: {
+      id: row.requester_id,
+      username: row.requester_username,
+    },
+    status: row.status,
+    created_at: row.created_at,
+  }));
+
+  return res.json({ requests });
+}
+
+const acceptFriendRequestQuery = `
+  UPDATE friend_requests
+  SET status = 'accepted',
+      updated_at = now()
+  WHERE receiver_id = $1 AND sender_id = $2 AND status = 'pending'
+  RETURNING id, sender_id, receiver_id, status, updated_at
+`;
+
+export async function acceptFriendRequest(req: AuthedRequest, res: Response) {
+  const userId = req.user!.userId;
+  const requestId = req.params.requestId;
+
+  const result = await pool.query(
+    `SELECT id, sender_id, receiver_id, status
+     FROM friend_requests
+     WHERE id = $1 AND receiver_id = $2`,
+    [requestId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Friend request not found or does not belong to you' });
+  }
+
+  const request = result.rows[0];
+  if (request.status !== 'pending') {
+    return res.status(400).json({ error: 'Friend request is no longer pending' });
+  }
+
+  try {
+    const updateResult = await pool.query(acceptFriendRequestQuery, [userId, request.sender_id]);
+
+    if (updateResult.rowCount === 0) {
+      // Another transaction may have already accepted this request
+      return res.status(400).json({ error: 'Friend request is no longer pending' });
+    }
+
+    const updatedRequest = updateResult.rows[0];
+    return res.status(200).json({
+      id: updatedRequest.id,
+      sender_id: updatedRequest.sender_id,
+      receiver_id: updatedRequest.receiver_id,
+      status: updatedRequest.status,
+      updated_at: updatedRequest.updated_at,
+    });
+  } catch (err: any) {
+    console.error('Accept friend request error:', err);
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'Friend request could not be accepted' });
+    }
+    return res.status(500).json({ error: 'Failed to accept friend request' });
+  }
+}
+
+const rejectFriendRequestQuery = `
+  UPDATE friend_requests
+  SET status = 'rejected',
+      updated_at = now()
+  WHERE receiver_id = $1 AND sender_id = $2 AND status = 'pending'
+  RETURNING id, sender_id, receiver_id, status, updated_at
+`;
+
+export async function rejectFriendRequest(req: AuthedRequest, res: Response) {
+  const userId = req.user!.userId;
+  const requestId = req.params.requestId;
+
+  const result = await pool.query(
+    `SELECT id, sender_id, receiver_id, status
+     FROM friend_requests
+     WHERE id = $1 AND receiver_id = $2`,
+    [requestId, userId]
+  );
+
+  if (result.rows.length === 0) {
+    return res.status(404).json({ error: 'Friend request not found or does not belong to you' });
+  }
+
+  const request = result.rows[0];
+  if (request.status !== 'pending') {
+    return res.status(400).json({ error: 'Friend request is no longer pending' });
+  }
+
+  try {
+    const updateResult = await pool.query(rejectFriendRequestQuery, [userId, request.sender_id]);
+
+    if (updateResult.rowCount === 0) {
+      // Another transaction may have already rejected/accepted this request
+      return res.status(400).json({ error: 'Friend request is no longer pending' });
+    }
+
+    const updatedRequest = updateResult.rows[0];
+    return res.status(200).json({
+      id: updatedRequest.id,
+      sender_id: updatedRequest.sender_id,
+      receiver_id: updatedRequest.receiver_id,
+      status: updatedRequest.status,
+      updated_at: updatedRequest.updated_at,
+    });
+  } catch (err: any) {
+    console.error('Reject friend request error:', err);
+    if (err?.code === '23505') {
+      return res.status(409).json({ error: 'Friend request could not be rejected' });
+    }
+    return res.status(500).json({ error: 'Failed to reject friend request' });
   }
 }
